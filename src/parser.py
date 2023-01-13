@@ -1,3 +1,5 @@
+# pyright: reportShadowedImports=false
+
 from .lexer_models import *
 from .parser_models import *
 from .exceptions import ParserException
@@ -79,13 +81,27 @@ class Parser:
         return self.expr_stmt()
     
     def expr_stmt(self) -> Expression:
-        return self.assignment_expr()
+        return self.object_expr()
+    
+    def object_expr(self):
+        if not self.peek_match(TokenType.LCURLY):
+            return self.assignment_expr()
+            
+        self.consume()
+        properties = list[Property]()    
+        while not self.peek_match(TokenType.RCURLY):
+            properties.append(self.parse_property())
+            
+        self.consume()
+            
+        return ObjectExp(properties)
+            
     
     def assignment_expr(self):
         left = self.parse_additive_expr()
         if self.peek_match(TokenType.OPERATOR, OPERATORS.ASSIGNMENT):
             self.consume()
-            right = self.assignment_expr()
+            right = self.expr_stmt()
             return AssignmentExp(left, right)
         return left
     
@@ -125,6 +141,35 @@ class Parser:
         
         else:
             raise ParserException(f"Unexpected token found during parsing: {curr}")
+        
+    def parse_property(self):
+        if not self.peek_match(TokenType.IDENTIFIER) and not self.peek_match(TokenType.LITERAL, LITERALS.STRING):
+            raise ParserException("Expected identifier or string literal, found {}".format(self.peek()))
+        
+        name = self.peek()
+        
+        self.consume()
+        
+        if not self.peek_match(TokenType.COLON):
+            raise ParserException("Expected ':' after property name, found {}".format(self.lookahead()))
+        
+        self.consume()
+        
+        value = self.expr_stmt()
+        
+        if isinstance(value, AssignmentExp):
+            raise ParserException("Cannot have an assignment expression as a property value")
+        
+        if self.peek_match(TokenType.RCURLY):
+            return Property(Identifier(name.lexeme), value)
+        
+        elif not self.peek_match(TokenType.COMMA):
+            raise ParserException("Expected ',' after property value, found {}".format(self.lookahead()))
+        
+        self.consume()
+        
+        return Property(Identifier(name.lexeme if name.type is TokenType.IDENTIFIER else name.literal), value)
+        
         
     def let_stmt(self):
         ident = self.consume() # consume the "let" keyword

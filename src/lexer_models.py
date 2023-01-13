@@ -12,6 +12,8 @@ class TokenType(Enum):
     RPAREN = "RPAREN"
     SQUARER = "SQUARER"
     SQUAREL = "SQUAREL"
+    LCURLY = "LCURLY"
+    RCURLY = "RCURLY"
     OPERATOR = "OPERATOR"
     DOT = "DOT"
     BACKSLASH = "BACKSLASH"

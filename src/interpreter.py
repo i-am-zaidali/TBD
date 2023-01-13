@@ -102,14 +102,17 @@ class Interpreter:
             return node
         
         elif isinstance(node, Token):
-            if node.type is TokenType.LITERAL:
-                return node.literal
-            
-            elif node.type is TokenType.NEWLINE:
+            if node.type is TokenType.NEWLINE:
                 return
             
         elif isinstance(node, Identifier):
             return self._eval_identifier(node, scope)
+        
+        elif isinstance(node, ObjectExp):
+            return self._eval_object(node, scope)
+        
+        else:
+            return "Not implemented"
             
     def _eval_binop(self, node: BinaryExp, scope: Scope = None):
         scope = scope or self.global_scope
@@ -163,6 +166,11 @@ class Interpreter:
             res = self._eval_node(node.value, scope)
             scope.assign_var(name, res)
             return res
+        
+    def _eval_object(self, node: ObjectExp, scope: Scope = None):
+        _d = Dict()
+        _d.values.update({prop.name.name: self._eval_node(prop.value, scope) for prop in node.properties})
+        return _d
         
     def _eval_identifier(self, node: Identifier, scope: Scope = None):
         scope = scope or self.global_scope

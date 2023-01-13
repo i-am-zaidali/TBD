@@ -1,18 +1,16 @@
 # file to define models that will be used in the AST of the language
 
 from .lexer_models import *
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import typing
 
-__all__ = ("Node", "Literal", "String", "Number", "Bool", "Null", "Statement", "Expression", "BinaryExp", "VarDec", "ConstDec", "Program", "literals", "UnaryExp", "AssignmentExp", "Identifier")
+__all__ = ("Node", "Literal", "String", "Number", "Bool", "Null", "Statement", "Expression", "BinaryExp", "VarDec", "ConstDec", "Program", "literals", "UnaryExp", "AssignmentExp", "Identifier", "Dict", "Property", "ObjectExp")
 
 class Node:
     pass # base class for all nodes in the AST
 
 @dataclass
-class Literal(Node):
-    value: str | int | float | bool | typing.Literal["null"]
-    
+class Literal(Node):    
     def is_arithmetic_compatible(self, other: "Literal"):
         raise NotImplementedError()
 
@@ -39,6 +37,10 @@ class Null(Literal):
     value: None = None
     def is_arithmetic_compatible(self, other: "Literal"):
         return False
+    
+@dataclass
+class Dict(Literal):
+    values: dict[str, Literal] = field(default_factory=dict[str, Literal])
 
 class Statement(Node):
     pass
@@ -79,6 +81,16 @@ class ConstDec(Statement):
 @dataclass
 class Program(Node):
     body: list[Statement|Token|Expression]
+
+@dataclass
+class Property(Expression):
+    name: Identifier
+    value: Expression
+    
+@dataclass
+class ObjectExp(Expression):
+    properties: list[Property]
+    
     
 literals: dict[typing.Type[int | float | str | bool] | typing.Literal["null"], Literal] = {
     int: Number,

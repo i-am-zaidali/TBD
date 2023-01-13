@@ -95,6 +95,10 @@ class Lexer:
             self._add_token(TokenType.SQUAREL, self.current, self.current)
         elif c == ']':
             self._add_token(TokenType.SQUARER, self.current, self.current)
+        elif c == '{':
+            self._add_token(TokenType.LCURLY, self.current, self.current)
+        elif c == '}':
+            self._add_token(TokenType.RCURLY, self.current, self.current)
         elif c in A_OPERATOR_TT:
             if self._match('='):
                 self._add_token(TokenType.OPERATOR, self.current, self.current+1, subtype=AA_OPERATOR_TT[c + '='])
