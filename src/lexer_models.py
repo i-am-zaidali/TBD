@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 __all__ = ("Token", "TokenType", "SUBTYPE", "KEYWORDS", "OPERATORS", "LITERALS")
 
+
 class TokenType(Enum):
     KEYWORD = "KEYWORD"
     LITERAL = "LITERAL"
@@ -10,8 +11,8 @@ class TokenType(Enum):
     COMMA = "COMMA"
     LPAREN = "LPAREN"
     RPAREN = "RPAREN"
-    SQUARER = "SQUARER"
-    SQUAREL = "SQUAREL"
+    LSQUARE = "LSQUARE"
+    RSQUARE = "RSQUARE"
     LCURLY = "LCURLY"
     RCURLY = "RCURLY"
     OPERATOR = "OPERATOR"
@@ -22,20 +23,23 @@ class TokenType(Enum):
     TAB = "TAB"
     EOF = "EOF"
     INVALID = "INVALID"
-    
+
     def __str__(self):
         return self.value
-    
+
+
 class SUBTYPE(Enum):
     def __str__(self) -> str:
         return self.value
-    
+
+
 class LITERALS(SUBTYPE):
     STRING = "STRING"
     NUMBER = "NUMBER"
     BOOL = "BOOL"
     NULL = "NULL"
-    
+
+
 class KEYWORDS(SUBTYPE):
     LET = "let"
     CONST = "const"
@@ -46,7 +50,8 @@ class KEYWORDS(SUBTYPE):
     # TAG = "tag"
     IF = "if"
     ELSE = "else"
-    
+
+
 class OPERATORS(SUBTYPE):
     PLUS = "+"
     MINUS = "-"
@@ -65,7 +70,8 @@ class OPERATORS(SUBTYPE):
     LESS_THAN = "<"
     GTEQUALS = GREATER_THAN + ASSIGNMENT
     LTEQUALS = LESS_THAN + ASSIGNMENT
-    NEQUALS = "!"+ASSIGNMENT
+    NEQUALS = "!" + ASSIGNMENT
+
 
 @dataclass
 class Token:
