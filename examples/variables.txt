@@ -1,0 +1,37 @@
+# declaring a variable
+
+let variable_name = 1
+# variable_name is now assigned the value: 1
+
+# we can assign different types of data to a variable
+# let variable_name = "hello world"
+# However the above line would error
+# since variable_name was already declared with the let keyword.
+# we can however reassign it.
+
+variable_name = "hello world"
+# This Works!
+
+# More data types are below:
+variable_name = 1.0 # this is also a Number!
+variable_name = true # this is a Boolean
+variable_name = [1, 2, 3] # this is an Array
+
+# Arrays are a collection of different data types all in one. THey can contain anything that the language supports. Even other arrays!
+variable_name = [[1, 2, 3], [4, 5, 6], [7, 8, 9]] # This is totally valid!
+
+variable_name = {"key": "value", "key2": "value2"} # this is a Dictionary
+
+# Dictionaries are a collection of key value pairs. The key and the value can be anything that the language supports. Even other dictionaries!
+# but it is preferred and recommended that Dictionaries only have strings as keys.
+variable_name = {"key": {"key": "value"}, "key2": {"key": "value"}} # This is also valid!
+
+# We also have a special data type called Null
+# it basically means nothing. It is used to represent the absence of a value.
+
+variable_name = null # this is a Null value
+
+# variables can also contain unnamed (lambda) functions, created with the tag keyword
+variable_name = tag { return x + 1 }
+
+# functions are descrbed better in their own section

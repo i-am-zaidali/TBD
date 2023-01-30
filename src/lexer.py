@@ -10,7 +10,8 @@ KEYWORD_TT = {
     "times": KEYWORDS.TIMES,
     "send": KEYWORDS.SEND,
     "to": KEYWORDS.TO,
-    # 'tag': KEYWORDS.TAG,
+    "tag": KEYWORDS.TAG,
+    "return": KEYWORDS.RETURN,
     "if": KEYWORDS.IF,
     "else": KEYWORDS.ELSE,
 }
@@ -82,6 +83,7 @@ class Lexer:
             self._add_token(TokenType.TAB, self.current, self.current)
         elif c == "\n":
             self._add_token(TokenType.NEWLINE, self.current, self.current)
+            self._advance(skipline=True)
         elif c == ",":
             self._add_token(TokenType.COMMA, self.current, self.current)
         elif c == ".":
@@ -141,16 +143,15 @@ class Lexer:
             self._identifier()
         elif c == "\0":
             self._add_token(TokenType.EOF, self.current, self.current, "\0")
+        elif c == "#":
+            self._comment()
+
         else:
             self._error()
 
     def _string(self, quote: str = '"'):
         start = self.current
-        while (
-            self._advance() != quote
-            and not self._peek_previous == "\\"
-            and not self._at_end()
-        ):
+        while self._advance() != quote and not self._peek_previous == "\\" and not self._at_end():
             if self._peek() == "\n" and self._peek_previous() != "\\":
                 self._error("Unterminated string at end of line {}".format(self.row))
 
@@ -168,12 +169,22 @@ class Lexer:
 
     def _number(self):
         start = self.current
-        while self._peek_next().isdigit():
-            self._advance()
-        if self._peek() == "." and self._peek_next().isdigit():
-            self._advance()
-            while self._peek_next().isdigit():
+        while True:
+            if self._peek_next().isdigit():
                 self._advance()
+
+            else:
+                break
+
+        if self._peek_next() == "." and self._peek(self.current + 2).isdigit():
+            self._advance()
+            while True:
+                if self._peek_next().isdigit():
+                    self._advance()
+
+                else:
+                    break
+
         value = self.source[start : self.current + 1]
         self._add_token(
             TokenType.LITERAL,
@@ -188,12 +199,14 @@ class Lexer:
         while self._peek_next().isalnum() or self._peek_next() == "_":
             self._advance()
         value = self.source[start : self.current + 1]
+        literal = None
         if value in KEYWORD_TT:
             type_ = TokenType.KEYWORD
             subtype = KEYWORD_TT[value]
         elif value in ("true", "false"):
             type_ = TokenType.LITERAL
             subtype = LITERALS.BOOL
+            literal = True if value == "true" else False
         elif value == "null":
             type_ = TokenType.LITERAL
             subtype = LITERALS.NULL
@@ -201,9 +214,19 @@ class Lexer:
             type_ = TokenType.IDENTIFIER
             subtype = None
 
-        self._add_token(type_, start, self.current, subtype=subtype)
+        self._add_token(type_, start, self.current, literal, subtype=subtype)
 
-    def _error(self, message: str = None):
+    def _comment(self):
+        start = self.current
+        self._advance(skipline=True)
+        self._add_token(
+            TokenType.COMMENT,
+            start,
+            self.current,
+            self.source[start + 1 : self.current].strip(),
+        )
+
+    def _error(self, message: Optional[str] = None):
         message = (
             message
             or f"Unexpected character {self._peek()} at {self.row} row, {self.column} column"
@@ -215,12 +238,13 @@ class Lexer:
         type_: TokenType,
         start: int,
         end: int,
-        literal: str = None,
-        subtype: SUBTYPE = None,
+        literal: Optional[str | int | float] = None,
+        subtype: Optional[SUBTYPE] = None,
     ):
         lexeme = self.source[start : end + 1]
         tok = Token(type_, subtype, lexeme, literal, self.row, start, end)
         self.tokens.append(tok)
+        return tok
 
     def _peek(self, index: Optional[int] = None):
         index = index or self.current
@@ -242,28 +266,26 @@ class Lexer:
         #     return False
         # return True
 
-    def _advance(self, times=1, newline=False):
-        self.current += times
-        self.column += times
-        if newline:
+    def _advance(self, times=1, skipline=False):
+        if self._at_end():
+            return "\0"
+        if not skipline:
+            self.current += times
+            self.row, self.column = self._get_rc_from_index(self.current)
+        else:
             self.row += 1
             self.column = 0
+            self.current = self._get_index_from_rc(self.row, self.column)
         return self._peek()
 
     def _get_rc_from_index(self, index: int):
-        newline_count = self.source[:index].count("\n")
-        row = newline_count + 1
-        column = index - self.source[:index].rfind("\n")
+        row = self.source.count("\n", 0, index) + 1
+        column = index - self.source.rfind("\n", 0, index)
         return row, column
 
     def _get_index_from_rc(self, row: int, column: int):
-        n = 0
-        index = 0
-        while n != (row - 1):
-            index += self.source[index:].find("\n") + 1
-            n += 1
-
-        return index + column
+        total_len = sum(len(line) + 1 for line in self.source_lines[: row - 1])
+        return total_len + (column - 1)
 
     @staticmethod
     def _is_alpha(c: str):

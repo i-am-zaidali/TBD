@@ -2,6 +2,7 @@
 
 from .lexer_models import *
 from .parser_models import *
+from .builtin_models import literals
 from .lexer import AA_OPERATOR_TT, A_OPERATOR_TT
 from .exceptions import ParserException
 from typing import List, Optional
@@ -27,16 +28,18 @@ class Parser:
     def peek_match(self, type: TokenType, subtype: Optional[SUBTYPE] = None) -> bool:
         to_check = self.peek()
         if to_check.type is type:
-            if subtype is not None:
-                if not to_check.subtype is subtype:
-                    return False
+            if subtype is not None and not to_check.subtype is subtype:
+                return False
             return True
         return False
 
     def lookahead(self):
         if self.at_end():
-            return None
+            raise ParserException("Unexpected end of file")
         return self.tokens[self.index + 1]
+
+    def previous(self):
+        return self.tokens[self.index - 1]
 
     def consume(self) -> Token:
         self.index += 1
@@ -60,19 +63,19 @@ class Parser:
             return self.let_stmt()
         elif self.peek_match(TokenType.KEYWORD, KEYWORDS.CONST):
             return self.const_stmt()
-        elif self.peek_match(TokenType.NEWLINE):
-            self.consume()
-            return literals["null"]
+        elif self.peek_match(TokenType.KEYWORD, KEYWORDS.IF):
+            return self.if_stmt()
         # elif self.match(TokenType.KEYWORD, KEYWORDS.LOOP):
         #     return self.loop_stmt()
         # elif self.match(TokenType.KEYWORD, KEYWORDS.SEND):
         #     return self.send_stmt()
-        # elif self.match(TokenType.KEYWORD, KEYWORDS.IF):
-        #     return self.if_stmt()
         # else:
         return self.expr_stmt()
 
     def expr_stmt(self) -> Expression:
+        if self.peek_match(TokenType.COMMENT) or self.peek_match(TokenType.NEWLINE):
+            self.consume()
+            return literals["null"]()
         return self.parse_assignment_expr()
 
     def parse_assignment_expr(self):
@@ -86,29 +89,26 @@ class Parser:
             return AssignmentExp(left, right)
 
         elif (
-            self.peek_match(TokenType.OPERATOR)
-            and self.peek().subtype in AA_OPERATOR_TT.values()
+            self.peek_match(TokenType.OPERATOR) and self.peek().subtype in AA_OPERATOR_TT.values()
         ):
-            if not isinstance(left, Identifier):
-                raise ParserException(
-                    "Cannot perform arithmetic assignment on non-identifier"
+            if isinstance(left, Identifier):
+                op = self.peek()
+
+                self.consume()
+
+                right = self.expr_stmt()
+                op = Token(
+                    TokenType.OPERATOR,
+                    A_OPERATOR_TT[op.lexeme[0]],
+                    op.lexeme[0],
+                    None,
+                    op.line,
+                    op.start_position,
+                    op.end_position,
                 )
-            op = self.peek()
 
-            self.consume()
-
-            right = self.expr_stmt()
-            op = Token(
-                TokenType.OPERATOR,
-                A_OPERATOR_TT[op.lexeme[0]],
-                op.lexeme[0],
-                None,
-                op.line,
-                op.start_position,
-                op.end_position,
-            )
-
-            return AssignmentExp(left, BinaryExp(left, op, right))
+                return AssignmentExp(left, BinaryExp(left, op, right))
+            raise ParserException("Cannot perform arithmetic assignment on non-identifier")
         return left
 
     def parse_additive_expr(self):
@@ -128,7 +128,7 @@ class Parser:
 
     def parse_multiplicative_expr(self):
 
-        left = self.parse_member_expr()
+        left = self.parse_comparative_expr()
         while (
             not self.at_end()
             and self.peek_match(TokenType.OPERATOR)
@@ -138,6 +138,28 @@ class Parser:
                 OPERATORS.POWER,
                 OPERATORS.REMAINDER,
                 OPERATORS.DIVIDE,
+            )
+        ):
+            operator = self.peek()
+            self.consume()
+            right = self.parse_comparative_expr()
+            left = BinaryExp(left, operator, right)
+
+        return left
+
+    def parse_comparative_expr(self):
+        left = self.parse_member_expr()
+        while (
+            not self.at_end()
+            and self.peek_match(TokenType.OPERATOR)
+            and self.peek().subtype
+            in (
+                OPERATORS.GREATER_THAN,
+                OPERATORS.LESS_THAN,
+                OPERATORS.GTEQUALS,
+                OPERATORS.LTEQUALS,
+                OPERATORS.COMPARISON,
+                OPERATORS.NEQUALS,
             )
         ):
             operator = self.peek()
@@ -172,35 +194,120 @@ class Parser:
         # function definitions will not define arguments
 
         if not self.peek_match(TokenType.LCURLY):
-            return self.parse_primary_expr()
+            return self.parse_function_def_expr()
 
         self.consume()  # consume the {
+
         if (
-            self.peek_match(TokenType.IDENTIFIER) and self.match(TokenType.COLON)
+            (
+                self.peek_match(TokenType.IDENTIFIER)
+                or self.peek().subtype in LITERALS.__members__.values()
+            )
+            and self.match(TokenType.COLON)
         ) or self.peek_match(TokenType.RCURLY):
             return self.parse_object_expr()
 
         caller = self.expr_stmt()
 
-        arguments = list[AssignmentExp]()
+        if type(caller) in literals.values():
+            raise ParserException("Cannot call a literal!")
+
+        arguments = list[FunctionArgument]()
+        arguments.append(FunctionArgument("__args", ArrayExp([])))
 
         while True:
             if self.peek_match(TokenType.RCURLY):
                 break
-            arg = self.parse_assignment_expr()
+
+            if self.peek_match(TokenType.COMMA):
+                self.consume()
+
+            arg = self.expr_stmt()
             if isinstance(arg, Identifier):
                 arg = AssignmentExp(arg, arg)
+            elif isinstance(arg, (BinaryExp, Literal)):
+                arguments[0].value.elements.append(arg)
+                continue
             elif not isinstance(arg, AssignmentExp):
                 raise ParserException(
                     "Function arguments must be either identifiers or assignments!"
                 )
-            arguments.append(arg)
-            if self.peek_match(TokenType.COMMA):
-                self.consume()
+            if not isinstance(arg.assignee, Identifier):
+                raise ParserException("Function arguments must be identifiers!")
+
+            if isinstance(arg.value, (AssignmentExp,)):
+                raise ParserException("Invalid syntax for function call!")
+
+            arguments.append(FunctionArgument(arg.assignee.name, arg.value))
 
         self.consume()
 
         return FunctionCallExp(caller, arguments)
+
+    def parse_function_def_expr(self):
+        if not self.peek_match(TokenType.KEYWORD, KEYWORDS.TAG):
+            return self.parse_array_expr()
+
+        self.consume()
+
+        name = None
+        return_val = literals["null"]()
+
+        if self.peek_match(TokenType.IDENTIFIER):
+            name = self.peek().lexeme
+            self.consume()
+
+        if self.peek_match(TokenType.LCURLY):
+            self.consume()
+            body = list[Statement]()
+            return_found = False  # to keep track of the first return statement.
+            while True:
+                if self.peek_match(TokenType.RCURLY):
+                    self.consume()
+                    break
+
+                elif self.peek_match(TokenType.NEWLINE):
+                    self.consume()
+                    continue
+
+                elif return_found:
+                    # if return statement has been found, the rest of the body will be ignored.
+                    self.consume()
+                    continue
+
+                elif self.peek_match(TokenType.KEYWORD, KEYWORDS.RETURN):
+                    return_val = self.parse_return_stmt()
+                    return_found = True
+                    continue
+
+                val = self.statement()
+
+                if self.peek_match(TokenType.RCURLY):
+                    self.consume()
+                    return_val = val
+                    break
+
+                body.append(val)
+
+        return FunctionDec(name, body, return_val)
+
+    def parse_return_stmt(self):
+        # I want to allow a single or multiple return values with a single return keyword.
+        # If there is a single return value, it will be returned as is.
+        # otherwise, an array will be returned with all the values
+        self.consume()
+        vals = list[Expression]()
+        while True:
+            vals.append(self.expr_stmt())
+            if not self.peek_match(TokenType.COMMA):
+                break
+
+            self.consume()
+
+        if len(vals) == 1:
+            return vals[0]
+
+        return ArrayExp(vals)
 
     def parse_object_expr(self):
         properties = list[Property]()
@@ -210,6 +317,23 @@ class Parser:
         self.consume()
 
         return ObjectExp(properties)
+
+    def parse_array_expr(self):
+        if not self.peek_match(TokenType.LSQUARE):
+            return self.parse_primary_expr()
+        self.consume()
+        values = list[Expression]()
+
+        while True:
+            if self.peek_match(TokenType.RSQUARE):
+                self.consume()
+                break
+            stmt = self.expr_stmt()
+            values.append(stmt)
+            if self.peek_match(TokenType.COMMA):
+                self.consume()
+
+        return ArrayExp(values)
 
     def parse_primary_expr(self):
         curr = self.peek()
@@ -232,12 +356,18 @@ class Parser:
             self.consume()
             return value
 
+        elif curr.type is TokenType.OPERATOR and curr.subtype in (OPERATORS.PLUS, OPERATORS.MINUS):
+            self.consume()
+            operator = curr
+            operand = self.parse_primary_expr()
+            return UnaryExp(operator, operand)
+
         else:
             raise ParserException(f"Unexpected token found during parsing: {curr}")
 
     def parse_property(self):
-        if not self.peek_match(TokenType.IDENTIFIER) and not self.peek_match(
-            TokenType.LITERAL, LITERALS.STRING
+        if not self.peek_match(TokenType.IDENTIFIER) and not (
+            self.peek().subtype in (LITERALS.STRING, LITERALS.NUMBER)
         ):
             raise ParserException(
                 "Expected identifier or string literal, found {}".format(self.peek())
@@ -257,9 +387,7 @@ class Parser:
         value = self.expr_stmt()
 
         if isinstance(value, AssignmentExp):
-            raise ParserException(
-                "Cannot have an assignment expression as a property value"
-            )
+            raise ParserException("Cannot have an assignment expression as a property value")
 
         if self.peek_match(TokenType.RCURLY):
             return Property(Identifier(name.lexeme), value)
@@ -272,9 +400,7 @@ class Parser:
         self.consume()
 
         return Property(
-            Identifier(
-                name.lexeme if name.type is TokenType.IDENTIFIER else name.literal
-            ),
+            Identifier(name.lexeme if name.type is TokenType.IDENTIFIER else name.literal),
             value,
         )
 
@@ -301,3 +427,60 @@ class Parser:
     def const_stmt(self):
         var = self.let_stmt()
         return ConstDec(var.name, var.value)  # shortcut :p
+
+    def if_stmt(self):
+        self.consume()  # consume the "if" keyword
+
+        cond = self.expr_stmt()
+
+        if not self.peek_match(TokenType.LCURLY):
+            raise ParserException(
+                "Expected '{' after condition, found {}".format(self.lookahead())
+            )
+
+        self.consume()  # consume the '{'
+
+        body = list[Statement]()
+
+        while True:
+            if self.peek_match(TokenType.RCURLY):
+                self.consume()
+                break
+
+            elif self.peek_match(TokenType.NEWLINE):
+                self.consume()
+                continue
+
+            body.append(self.expr_stmt())
+
+        if self.peek_match(TokenType.KEYWORD, KEYWORDS.ELSE):
+
+            self.consume()
+
+            if self.peek_match(TokenType.KEYWORD, KEYWORDS.IF):
+                return IfStatement(cond, body, self.if_stmt())
+
+            else:
+                else_body = list[Statement]()
+
+                if not self.peek_match(TokenType.LCURLY):
+                    raise ParserException(
+                        "Expected '{' after 'else', found {}".format(self.lookahead())
+                    )
+
+                self.consume()  # consume the '{'
+
+                while True:
+                    if self.peek_match(TokenType.RCURLY):
+                        self.consume()
+                        break
+
+                    elif self.peek_match(TokenType.NEWLINE):
+                        self.consume()
+                        continue
+
+                    else_body.append(self.expr_stmt())
+
+                return IfStatement(cond, body, else_body)
+
+        return IfStatement(cond, body, None)

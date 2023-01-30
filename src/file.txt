@@ -1,0 +1,17 @@
+# variables are defined with the let KEYWORD
+
+let a = 10
+
+# variables can be of 7 types:
+# Number, String, Array, Dict, Boolean, Null, Function
+
+# variables can be redefined after being declared with the let keyword. However they cant be declared again.
+
+# let a = 10 would be wrong here
+
+a = [1, 2, 3]
+a = "Hello World"
+a = {name: "John", age: 20}
+a = true
+a = tag {return 1 + 2} # this is a function
+a = null

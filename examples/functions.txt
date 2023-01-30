@@ -1,0 +1,113 @@
+# funtions can be described as blocks of code that can be executed multiple times later without having to rewrite the block of code again and again in different places
+
+# If you come from a programming background, and have used other langauges,
+# you proabbyl already know how function definitions and calls work normally.
+# However, TBD brings a major (not so much actually) change to both those concepts.
+# In TBD, functions are defined using the tag keyword, followed by an optional name and then the block of code within curly braces ({})
+# The name of the function is optional, and if not provided, the function is called an anonymous function.
+# There are no arguments in a function, and any function can be called with any number of arguments.
+
+# an example of a function that returns the sum of two numbers is given below
+
+tag sum {
+    return a + b
+}
+
+# as you can see above, the function returns the sum of `a` and `b` using the `return` keyword.
+# but we never defined a and b anywhere did we?
+# These variables are known as function specific variables.
+# If they are available in the parent scope, they will be available in the function as well.
+# But will be overridden if passed in the function call and available only in the function scope.
+# if passed while calling the function as arguments, they will be available as is within the function.
+# otherwise they will be internally initialized to null.
+
+# to call a function, you use two curly braces, with the name of the function and arguments within them.
+# Example:
+
+{sum a=1, b=1}
+
+# the above function call will return 2, as the function returns the sum of a and b.
+# To pass arguments in a function, there are 3 ways to do so:
+# 1. using the `a=1, b=2` syntax as shown above where a and b are the names of the arguments and 1 and 2 are the values.
+# 2. passing literals as is `1, 2, 3, "string"` etc. Such values will be added to an array called `__args` within the function.
+# 3. passing variables like `a, b, c` etc. Such values will be assigned to the variables with the same name as the argument name.
+#    If the argument name is not available in the parent scope, it will error out.
+
+# Example:
+
+# {sum 11, 22}
+
+# or
+let a = 11
+let b = 22
+{sum a, b}
+
+
+# the above two function calls will return 33, as the function returns the sum of a and b.
+
+# Since functions are blocks of code, they can be nested within other functions as well.
+# Example:
+
+tag outer_func {
+    tag inner_func {
+        return 1
+    }
+    return {inner_func} + 1
+}
+
+# these inner functions have access to the variables of the outer function as well.
+# Example:
+
+tag outer_func {
+    let a = 1
+    tag inner_func {
+        return a + 1
+    }
+    return {inner_func} + 1
+}
+
+# Since function names are optional in TBD, you can also define anonymous functions.
+
+tag {
+    return 1
+}
+
+# the above is an anonymous function that returns 1.
+
+# anonymous functions can be assigned to variables
+a = tag {
+    return 1
+}
+
+# and can be called using the variable name
+
+{a}
+
+# function return values can be anything that can be assigned to a variable.
+# Example:
+
+tag name {
+    return 1
+}
+
+let return_value = {name} # return_value is now 1
+
+# functions can also be passed as arguments to other functions.
+# Example:
+
+tag outer_func {
+    let res = {callback_func}
+    return res
+}
+
+{outer_func callback_func=tag {return 1} } # returns 1
+
+# functions can also be returned from other functions.
+
+tag outer_func {
+    return tag {
+        return 1
+    }
+}
+
+{ {outer_func} } + 1 # returns 2

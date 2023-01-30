@@ -23,6 +23,8 @@ class TokenType(Enum):
     TAB = "TAB"
     EOF = "EOF"
     INVALID = "INVALID"
+    HASH = "HASH"
+    COMMENT = "COMMENT"
 
     def __str__(self):
         return self.value
@@ -47,7 +49,8 @@ class KEYWORDS(SUBTYPE):
     TIMES = "times"
     SEND = "send"
     TO = "to"
-    # TAG = "tag"
+    TAG = "tag"
+    RETURN = "return"
     IF = "if"
     ELSE = "else"
 
@@ -60,17 +63,17 @@ class OPERATORS(SUBTYPE):
     DIVIDE = "/"
     REMAINDER = "%"
     ASSIGNMENT = "="
-    PLUS_EQUALS = PLUS + ASSIGNMENT
-    MINUS_EQUALS = MINUS + ASSIGNMENT
-    MULTIPLY_EQUALS = MULTIPLY + ASSIGNMENT
-    DIVIDE_EQUALS = DIVIDE + ASSIGNMENT
-    POWER_EQUALS = POWER + ASSIGNMENT
+    PLUS_EQUALS = getattr(PLUS, "value", "+") + getattr(ASSIGNMENT, "value", "=")
+    MINUS_EQUALS = getattr(MINUS, "value", "-") + getattr(ASSIGNMENT, "value", "=")
+    MULTIPLY_EQUALS = getattr(MULTIPLY, "value", "*") + getattr(ASSIGNMENT, "value", "=")
+    DIVIDE_EQUALS = getattr(DIVIDE, "value", "/") + getattr(ASSIGNMENT, "value", "=")
+    POWER_EQUALS = getattr(POWER, "value", "^") + getattr(ASSIGNMENT, "value", "=")
     COMPARISON = "=="
     GREATER_THAN = ">"
     LESS_THAN = "<"
-    GTEQUALS = GREATER_THAN + ASSIGNMENT
-    LTEQUALS = LESS_THAN + ASSIGNMENT
-    NEQUALS = "!" + ASSIGNMENT
+    GTEQUALS = getattr(GREATER_THAN, "value", ">") + getattr(ASSIGNMENT, "value", "=")
+    LTEQUALS = getattr(LESS_THAN, "value", "<") + getattr(ASSIGNMENT, "value", "=")
+    NEQUALS = "!" + getattr(ASSIGNMENT, "value", "=")
 
 
 @dataclass

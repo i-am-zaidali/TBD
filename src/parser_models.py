@@ -1,29 +1,27 @@
 # file to define models that will be used in the AST of the language
 
 from .lexer_models import *
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import typing
 
 __all__ = (
     "Node",
     "Literal",
-    "String",
-    "Number",
-    "Bool",
-    "Null",
     "Statement",
+    "IfStatement",
+    "FunctionArgument",
     "Expression",
     "BinaryExp",
     "VarDec",
     "ConstDec",
     "Program",
-    "literals",
     "UnaryExp",
     "AssignmentExp",
     "Identifier",
-    "Dict",
     "Property",
     "ObjectExp",
+    "FunctionDec",
+    "ArrayExp",
     "FunctionCallExp",
     "MemberExp",
 )
@@ -42,46 +40,42 @@ class Expression(Statement):
 
 
 @dataclass
+class IfStatement(Statement):
+    condition: Expression
+    body: list[Statement]
+    _else: list[Statement] | typing.Optional["IfStatement"]
+
+
+@dataclass
 class Literal(Expression):
+    value: str | bool | float | int | None | dict | list = None
+
     def is_arithmetic_compatible(self, other: "Literal"):
         raise NotImplementedError()
 
+    def __add(self, other: "Literal"):
+        raise NotImplementedError()
 
-@dataclass
-class String(Literal):
-    value: str
+    def __sub(self, other: "Literal"):
+        raise NotImplementedError()
 
-    def is_arithmetic_compatible(self, other: "Literal"):
-        return isinstance(other, String)
+    def __mul(self, other: "Literal"):
+        raise NotImplementedError()
 
+    def __div(self, other: "Literal"):
+        raise NotImplementedError()
 
-@dataclass
-class Number(Literal):
-    value: int | float
+    def __mod(self, other: "Literal"):
+        raise NotImplementedError()
 
-    def is_arithmetic_compatible(self, other: "Literal"):
-        return isinstance(other, Number) or isinstance(other, Bool)
+    def __pow(self, other: "Literal"):
+        raise NotImplementedError()
 
+    def __eq(self, other: "Literal"):
+        raise NotImplementedError()
 
-@dataclass
-class Bool(Literal):
-    value: bool
-
-    def is_arithmetic_compatible(self, other: "Literal"):
-        return isinstance(other, Number) or isinstance(other, Bool)
-
-
-@dataclass
-class Null(Literal):
-    value: None = None
-
-    def is_arithmetic_compatible(self, other: "Literal"):
-        return False
-
-
-@dataclass
-class Dict(Literal):
-    values: dict[str, Literal] = field(default_factory=dict[str, Literal])
+    def __access_property(self, property: str):
+        raise NotImplementedError()
 
 
 @dataclass
@@ -92,15 +86,15 @@ class Identifier(Expression):
 
 @dataclass
 class BinaryExp(Expression):
-    left: typing.Union[Token, "BinaryExp"]
+    left: Expression
     operator: Token
-    right: typing.Union[Token, "BinaryExp"]
+    right: Expression
 
 
 @dataclass
 class UnaryExp(Expression):
     operator: Token
-    operand: typing.Union[Token, "UnaryExp"]
+    operand: Expression
 
 
 @dataclass
@@ -115,10 +109,13 @@ class VarDec(Statement):
     value: Expression
 
 
+class ConstDec(VarDec):
+    pass
+
+
 @dataclass
-class ConstDec(Statement):
-    name: str
-    value: Expression
+class FunctionArgument(VarDec):
+    pass
 
 
 @dataclass
@@ -138,32 +135,34 @@ class ObjectExp(Expression):
 
 
 @dataclass
+class ArrayExp(Expression):
+    elements: list[Expression]
+
+
+@dataclass
 class FunctionCallExp(Expression):
     # function calls will not be like traditional function calls with paranthesis.
     # they will be like this:
     # { function ...arguments}
     caller: Expression
-    arguments: list[AssignmentExp]
+    arguments: list[FunctionArgument]
     # I only want to support keyword arguments. No positional arguments.
     # so if you try using positional arguments, it will just consider them as keyword arguments.
     # so a function call like this:
     # { function a=a, b}
     # b will be passed as a kwarg with the name "b" and the value of the variable b (if it exists).
+    # if literal values are passed, they will be accumulated in a list and passed as a single argument `__args`
+
+
+@dataclass
+class FunctionDec(Statement):
+    name: str | None
+    body: list[Statement]
+    returns: Expression
 
 
 @dataclass
 class MemberExp(Expression):
     object: Expression
-    value: Expression
+    value: Literal | Identifier
     computed: bool
-
-
-literals: dict[
-    typing.Type[int | float | str | bool] | typing.Literal["null"], Literal
-] = {
-    int: Number,
-    float: Number,
-    str: String,
-    bool: Bool,
-    "null": Null,
-}

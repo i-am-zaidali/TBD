@@ -1,34 +1,61 @@
-from .lexer import Lexer
-from .parser import Parser
 from pprint import pprint as pp
 import logging
 import sys
 from .interpreter import Interpreter, Scope
+from .builtin_models import BuiltInFunction
+import argparse
+import pathlib
 
-if __name__ == "__main__":
-    
+
+def __handle_print(args):
+    if not args["__args"].value:
+        del args["__args"]
+
+    else:
+        [print(a, end=" ") for a in args["__args"].value]
+        del args["__args"]
+    print(*args.values())
+
+
+def create_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--file", "-f", default=None, dest="file")
+    return parser
+
+
+def get_default_scope():
     scope = Scope()
-    
+    scope.declare_var("print", BuiltInFunction(__handle_print))
+    return scope
+
+
+def error(message: str = "", REPL=False):
+    if message:
+        print("Error: {}".format(message))
+
+    print(f"Exiting{' REPL' if REPL else ''}.")
+    sys.exit(1)
+
+
+def start_repl():
+    scope = get_default_scope()
     while True:
         lines = []
         while True:
             try:
                 line = input(">>> ")
-                print(line)
                 if not line:
                     break
                 elif line == "exit":
-                    sys.exit(1)
+                    error(REPL=True)
             except EOFError:
                 break
             except KeyboardInterrupt:
-                print("Exiting!")
-                sys.exit(1)
+                error("Keyboard Interrupt detected. Exiting.")
             else:
                 lines.append(line)
         try:
             joint = "\n".join(lines)
-            print(repr(joint))
             ip = Interpreter(joint, scope)
             iterator = ip.evaluate()
             for i in iterator:
@@ -37,5 +64,26 @@ if __name__ == "__main__":
             break
         except Exception as e:
             logging.exception("Exception in REPL: ", exc_info=e)
-        
-    
+
+
+if __name__ == "__main__":
+    parser = create_parser()
+
+    flags = vars(parser.parse_args())
+
+    if fn := flags.get("file"):
+        path = pathlib.Path(fn)
+        if not path.is_file():
+            error("Filename is not a valid file!")
+
+        else:
+            with path.open("r") as file:
+                text = file.read()
+
+            ip = Interpreter(text, get_default_scope())
+            for res in ip.evaluate():
+                print(res)
+            error()
+
+    else:
+        start_repl()
